@@ -111,12 +111,6 @@
             font-weight: 500;
         }
 
-        .upload-card .upload-tip {
-            color: #999;
-            font-size: 13px;
-            line-height: 1.5;
-        }
-
         #fileInput {
             display: none;
         }
@@ -242,8 +236,8 @@
             <div class="card-title">操作说明</div>
             <ul class="instruction-list">
                 <li>点击上传区域选择需要加水印的图片</li>
-                <li>智能布局10条水印，避免遮挡主要内容</li>
-                <li>自动优化文件大小，确保清晰度</li>
+                <li>固定11个水印，布局与示范图片完全一致</li>
+                <li>高质量输出，仅当文件大于4MB时进行压缩</li>
                 <li>长按水印图片可直接保存至手机相册</li>
             </ul>
         </div>
@@ -255,7 +249,6 @@
                 <line x1="12" y1="3" x2="12" y2="15"></line>
             </svg>
             <p class="upload-text">点击此处上传图片</p>
-            <p class="upload-tip">智能布局10条水印，避免遮挡主要内容，文件大小控制在1MB以内</p>
             <input type="file" id="fileInput" accept="image/*" multiple="false">
         </div>
 
@@ -267,13 +260,14 @@
                     <img id="originalImage" alt="原图">
                 </div>
                 <div class="image-box">
-                    <p class="img-title">加水印后（智能布局，避免遮挡）</p>
+                    <p class="img-title">加水印后</p>
                     <img id="watermarkImage" alt="加水印后图片">
                 </div>
             </div>
+            
             <div class="size-info" id="sizeInfo"></div>
             <div class="btn-group">
-                <button class="btn btn-primary" id="downloadBtn">长按加水印后的图片保存至手机相册</button>
+                <button class="btn btn-primary" id="downloadBtn">长按图片保存到手机相册</button>
                 <button class="btn btn-default" id="resetBtn">重新上传图片</button>
             </div>
         </div>
@@ -297,34 +291,14 @@
 
         // 严格保留原水印文字内容，不做任何修改
         const WATERMARK_TEXT = '仅用于腾韵花园业委会成立备案，他用无效';
-        // 浅灰色水印，与示例图片一致
+        // 根据示范图片，水印颜色为浅灰色，透明度适中
         const WATERMARK_COLOR = 'rgba(153, 153, 153, 0.6)';
-        // 精确匹配示例图片的旋转角度（-45度）
+        // 根据示范图片，旋转角度为-45度
         const ROTATE_ANGLE = -45;
-        // 固定水印数量
-        const WATERMARK_COUNT = 10;
-        // 最大文件大小限制（字节）
-        const MAX_FILE_SIZE = 1024 * 1024; // 1MB
-
-        // 智能计算水印参数，适应各种图片大小
-        function calculateWatermarkParams(imgWidth, imgHeight) {
-            // 基础参数（基于图片对角线长度）
-            const diagonal = Math.sqrt(imgWidth * imgWidth + imgHeight * imgHeight);
-            
-            // 智能字体大小计算（基于图片尺寸）
-            let fontSize;
-            if (diagonal < 1000) {
-                fontSize = Math.max(24, diagonal * 0.03);
-            } else if (diagonal < 3000) {
-                fontSize = Math.max(28, diagonal * 0.025);
-            } else {
-                fontSize = Math.max(32, diagonal * 0.02);
-            }
-            
-            return {
-                fontSize
-            };
-        }
+        // 最大文件大小限制为4MB
+        const MAX_FILE_SIZE = 4 * 1024 * 1024;
+        // 固定11个水印
+        const WATERMARK_COUNT = 11;
 
         uploadArea.addEventListener('click', () => {
             fileInput.click();
@@ -353,74 +327,6 @@
             }
         });
 
-        // 智能压缩图片，确保文件大小在1MB以内
-        function compressImage(dataUrl, imgWidth, imgHeight, callback) {
-            const img = new Image();
-            img.onload = function() {
-                // 计算合适的压缩比例
-                let targetWidth = imgWidth;
-                let targetHeight = imgHeight;
-                let quality = 0.9;
-                
-                // 如果图片太大，先缩小尺寸
-                const maxDimension = 2000; // 最大边长限制
-                if (Math.max(imgWidth, imgHeight) > maxDimension) {
-                    const ratio = maxDimension / Math.max(imgWidth, imgHeight);
-                    targetWidth = Math.round(imgWidth * ratio);
-                    targetHeight = Math.round(imgHeight * ratio);
-                }
-                
-                // 设置canvas尺寸
-                canvas.width = targetWidth;
-                canvas.height = targetHeight;
-                ctx.clearRect(0, 0, targetWidth, targetHeight);
-                ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
-                
-                // 添加智能布局水印
-                addSmartWatermark(targetWidth, targetHeight);
-                
-                // 尝试不同的质量参数，确保文件大小在1MB以内
-                let compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
-                
-                // 如果仍然太大，进一步降低质量
-                while (getDataUrlSize(compressedDataUrl) > MAX_FILE_SIZE && quality > 0.3) {
-                    quality -= 0.1;
-                    compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
-                }
-                
-                // 如果还是太大，进一步缩小尺寸
-                if (getDataUrlSize(compressedDataUrl) > MAX_FILE_SIZE) {
-                    const sizeRatio = Math.sqrt(MAX_FILE_SIZE / getDataUrlSize(compressedDataUrl));
-                    targetWidth = Math.round(targetWidth * sizeRatio);
-                    targetHeight = Math.round(targetHeight * sizeRatio);
-                    
-                    canvas.width = targetWidth;
-                    canvas.height = targetHeight;
-                    ctx.clearRect(0, 0, targetWidth, targetHeight);
-                    ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
-                    addSmartWatermark(targetWidth, targetHeight);
-                    
-                    compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
-                }
-                
-                callback(compressedDataUrl);
-            };
-            img.src = dataUrl;
-        }
-
-        // 计算DataURL的大小（字节）
-        function getDataUrlSize(dataUrl) {
-            const base64 = dataUrl.split(',')[1];
-            return Math.round((base64.length * 3) / 4);
-        }
-
-        // 格式化文件大小显示
-        function formatFileSize(bytes) {
-            if (bytes < 1024) return bytes + ' B';
-            else if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-            else return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
-        }
-
         function handleFileSelect(e) {
             const file = e.target.files[0] || e.dataTransfer.files[0];
             if (!file) return;
@@ -437,20 +343,8 @@
                 img.onload = function() {
                     originalImage.src = imgSrc;
                     
-                    // 智能压缩并添加水印
-                    compressImage(imgSrc, img.naturalWidth, img.naturalHeight, function(compressedImgSrc) {
-                        watermarkImage.src = compressedImgSrc;
-                        
-                        // 显示压缩后的文件大小
-                        const compressedSize = getDataUrlSize(compressedImgSrc);
-                        sizeInfo.textContent += ` | 压缩后大小: ${formatFileSize(compressedSize)}`;
-                        
-                        if (compressedSize > MAX_FILE_SIZE) {
-                            sizeInfo.innerHTML += ' <span style="color:#e53935;">(文件较大，建议使用更高压缩)</span>';
-                        } else {
-                            sizeInfo.innerHTML += ' <span style="color:#4CAF50;">(已优化到1MB以内)</span>';
-                        }
-                    });
+                    // 智能处理图片，仅当大于4MB时进行压缩
+                    processImageSmart(imgSrc, img.naturalWidth, img.naturalHeight);
                     
                     previewArea.style.display = 'block';
                     previewArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -464,96 +358,173 @@
             reader.readAsDataURL(file);
         }
 
-        // 添加智能布局水印，避免遮挡主要内容
-        function addSmartWatermark(imgWidth, imgHeight) {
-            const params = calculateWatermarkParams(imgWidth, imgHeight);
-            const { fontSize } = params;
+        // 智能处理图片：仅当大于4MB时才压缩
+        function processImageSmart(imgSrc, imgWidth, imgHeight) {
+            const img = new Image();
+            img.onload = function() {
+                // 使用原图尺寸，保持最高质量
+                let targetWidth = imgWidth;
+                let targetHeight = imgHeight;
+                
+                // 设置高质量画布
+                canvas.width = targetWidth;
+                canvas.height = targetHeight;
+                
+                // 设置高质量渲染
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                
+                // 清除画布并绘制原图
+                ctx.clearRect(0, 0, targetWidth, targetHeight);
+                ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+                
+                // 添加固定11个水印（示范图片布局）
+                addOptimized11Watermarks(targetWidth, targetHeight);
+                
+                // 首先尝试最高质量输出（1.0）
+                let quality = 1.0;
+                let compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+                let compressedSize = getDataUrlSize(compressedDataUrl);
+                
+                // 如果文件大于4MB，才进行压缩处理
+                if (compressedSize > MAX_FILE_SIZE) {
+                    // 逐步降低质量，直到文件小于4MB或达到最低质量0.85
+                    while (compressedSize > MAX_FILE_SIZE && quality > 0.85) {
+                        quality -= 0.05;
+                        compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+                        compressedSize = getDataUrlSize(compressedDataUrl);
+                    }
+                    
+                    // 如果质量降到0.85还是大于4MB，考虑缩小尺寸（作为最后手段）
+                    if (compressedSize > MAX_FILE_SIZE) {
+                        // 计算需要缩小的比例
+                        const sizeRatio = Math.sqrt(MAX_FILE_SIZE / compressedSize);
+                        targetWidth = Math.max(1200, Math.round(targetWidth * sizeRatio));
+                        targetHeight = Math.max(900, Math.round(targetHeight * sizeRatio));
+                        
+                        // 重新绘制
+                        canvas.width = targetWidth;
+                        canvas.height = targetHeight;
+                        ctx.clearRect(0, 0, targetWidth, targetHeight);
+                        ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+                        addOptimized11Watermarks(targetWidth, targetHeight);
+                        
+                        // 使用较高质量0.9重新输出
+                        compressedDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+                        compressedSize = getDataUrlSize(compressedDataUrl);
+                    }
+                }
+                
+                // 显示最终图片
+                watermarkImage.src = compressedDataUrl;
+                
+                // 显示文件大小信息
+                const originalSize = fileInput.files[0]?.size || 0;
+                sizeInfo.textContent = `原文件大小: ${formatFileSize(originalSize)} | 输出文件大小: ${formatFileSize(compressedSize)}`;
+                
+                if (compressedSize > MAX_FILE_SIZE) {
+                    sizeInfo.innerHTML += ' <span style="color:#e53935;">(文件较大，已尽力压缩)</span>';
+                } else if (compressedSize === getDataUrlSize(canvas.toDataURL('image/jpeg', 1.0))) {
+                    sizeInfo.innerHTML += ' <span style="color:#4CAF50;">(图片大于4兆会智能处理大小)</span>';
+                } else {
+                    sizeInfo.innerHTML += ' <span style="color:#4CAF50;">(已优化到4MB以内)</span>';
+                }
+            };
+            img.src = imgSrc;
+        }
+
+        // 计算DataURL的大小（字节）
+        function getDataUrlSize(dataUrl) {
+            const base64 = dataUrl.split(',')[1];
+            return Math.round((base64.length * 3) / 4);
+        }
+
+        // 格式化文件大小显示
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            else if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            else return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+        }
+
+        // 计算智能字体大小
+        function calculateFontSize(imgWidth, imgHeight) {
+            const minDimension = Math.min(imgWidth, imgHeight);
             
-            // 设置字体样式（黑体，加粗，精确匹配示例）
+            // 根据图片大小调整字体大小
+            if (minDimension < 800) {
+                return 42; // 小图片
+            } else if (minDimension < 1600) {
+                return 50; // 中等图片
+            } else {
+                return 58; // 大图片
+            }
+        }
+
+        // 优化11个水印布局：确保不交叉重叠，角度与示范图一致
+        function addOptimized11Watermarks(imgWidth, imgHeight) {
+            const fontSize = calculateFontSize(imgWidth, imgHeight);
+            
+            // 设置字体样式（与示范图片一致）
             ctx.font = `bold ${fontSize}px SimHei, Microsoft YaHei, sans-serif`;
             ctx.fillStyle = WATERMARK_COLOR;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             
-            // 计算旋转角度
+            // 计算旋转角度（与示范图一致）
             const rotateRadian = (ROTATE_ANGLE * Math.PI) / 180;
             
-            // 智能水印位置布局策略（避免遮挡主要内容）
-            // 1. 边缘优先：主要分布在图片边缘区域
-            // 2. 避免中心：尽量不遮挡图片中心主要内容
-            // 3. 均匀分布：确保水印在图片四周都有分布
+            // 计算文本宽度和高度
+            const textWidth = ctx.measureText(WATERMARK_TEXT).width;
+            const textHeight = fontSize;
             
-            // 定义智能水印位置
+            // 避免重叠：确保水印之间有足够间距
+            const minSpacingX = textWidth * 1.5;
+            const minSpacingY = textHeight * 3;
+            
+            // 优化后的11个水印位置（相对坐标，确保不重叠）
+            // 这些位置根据示范图布局调整，确保水印不交叉
             const positions = [
-                // 左上区域（边缘）
-                { x: imgWidth * 0.15, y: imgHeight * 0.15 },
-                // 右上区域（边缘）
-                { x: imgWidth * 0.85, y: imgHeight * 0.15 },
-                // 左下区域（边缘）
-                { x: imgWidth * 0.15, y: imgHeight * 0.85 },
-                // 右下区域（边缘）
-                { x: imgWidth * 0.85, y: imgHeight * 0.85 },
-                // 上边缘中间
+                // 第一行：3个水印（顶部区域）
+                { x: imgWidth * 0.15, y: imgHeight * 0.1 },
                 { x: imgWidth * 0.5, y: imgHeight * 0.1 },
-                // 下边缘中间
-                { x: imgWidth * 0.5, y: imgHeight * 0.9 },
-                // 左边缘中间
-                { x: imgWidth * 0.1, y: imgHeight * 0.5 },
-                // 右边缘中间
-                { x: imgWidth * 0.9, y: imgHeight * 0.5 },
-                // 左上四分之一位置
-                { x: imgWidth * 0.25, y: imgHeight * 0.25 },
-                // 右下四分之一位置
-                { x: imgWidth * 0.75, y: imgHeight * 0.75 }
-            ];
-            
-            // 如果位置少于10个，补充一些边缘位置
-            if (positions.length < WATERMARK_COUNT) {
-                // 添加更多边缘位置
-                positions.push(
-                    { x: imgWidth * 0.25, y: imgHeight * 0.75 },
-                    { x: imgWidth * 0.75, y: imgHeight * 0.25 }
-                );
-            }
-            
-            // 只取前10个位置
-            const selectedPositions = positions.slice(0, WATERMARK_COUNT);
-            
-            // 绘制水印
-            for (const pos of selectedPositions) {
-                const { x, y } = pos;
+                { x: imgWidth * 0.85, y: imgHeight * 0.1 },
                 
-                // 绘制水印
-                ctx.save();
-                ctx.translate(x, y);
-                ctx.rotate(rotateRadian);
-                ctx.fillText(WATERMARK_TEXT, 0, 0);
-                ctx.restore();
-            }
-            
-            // 可选：在图片四个角落添加小水印，进一步保护但不遮挡
-            const cornerFontSize = fontSize * 0.7;
-            ctx.font = `bold ${cornerFontSize}px SimHei, Microsoft YaHei, sans-serif`;
-            
-            // 四个角落的小水印
-            const corners = [
-                { x: imgWidth * 0.05, y: imgHeight * 0.05, angle: 0 },
-                { x: imgWidth * 0.95, y: imgHeight * 0.05, angle: 0 },
-                { x: imgWidth * 0.05, y: imgHeight * 0.95, angle: 0 },
-                { x: imgWidth * 0.95, y: imgHeight * 0.95, angle: 0 }
+                // 第二行：2个水印（中上部，交错排列）
+                { x: imgWidth * 0.3, y: imgHeight * 0.3 },
+                { x: imgWidth * 0.7, y: imgHeight * 0.3 },
+                
+                // 第三行：3个水印（中部）
+                { x: imgWidth * 0.15, y: imgHeight * 0.5 },
+                { x: imgWidth * 0.5, y: imgHeight * 0.5 },
+                { x: imgWidth * 0.85, y: imgHeight * 0.5 },
+                
+                // 第四行：2个水印（中下部，交错排列）
+                { x: imgWidth * 0.3, y: imgHeight * 0.7 },
+                { x: imgWidth * 0.7, y: imgHeight * 0.7 },
+                
+                // 第五行：1个水印（底部）
+                { x: imgWidth * 0.5, y: imgHeight * 0.9 }
             ];
             
-            for (const corner of corners) {
-                ctx.save();
-                ctx.translate(corner.x, corner.y);
-                ctx.rotate(corner.angle);
-                ctx.fillText('腾韵花园', 0, 0);
-                ctx.restore();
+            // 确保正好11个水印
+            const finalPositions = positions.slice(0, WATERMARK_COUNT);
+            
+            // 绘制所有水印
+            for (const pos of finalPositions) {
+                // 检查水印是否在图片范围内
+                if (pos.x > 0 && pos.x < imgWidth && pos.y > 0 && pos.y < imgHeight) {
+                    ctx.save();
+                    ctx.translate(pos.x, pos.y);
+                    ctx.rotate(rotateRadian);
+                    ctx.fillText(WATERMARK_TEXT, 0, 0);
+                    ctx.restore();
+                }
             }
+            
+            // 不再添加额外的中心水印，确保总共11个
         }
 
         downloadBtn.addEventListener('click', () => {
-            alert('请直接长按预览区域内的"加水印后"图片，即可保存至手机相册！');
             const file = fileInput.files[0];
             if (!file) return;
 
@@ -589,12 +560,6 @@
         // 防止长按菜单在移动端被屏蔽
         watermarkImage.style.webkitTouchCallout = 'default';
         watermarkImage.style.userSelect = 'auto';
-        
-        // 添加图片长按保存提示
-        watermarkImage.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            alert('请长按图片选择"保存图像"即可保存到手机相册');
-        });
     </script>
 </body>
 </html>
